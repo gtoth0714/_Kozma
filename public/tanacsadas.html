@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <link rel="stylesheet" href="style.css">
+        <title>Kozma-Consulting-Consulting</title>
+    </head>
+    <body>
+        <div class="Fejlec">
+            <div class="Cegnev">
+                KOZMA-CONSULTING KFT.
+            </div>
+            <div class="menu-container">
+                <a href="index.html">HOME</a>
+                <a href="szolgaltatasok.html">SERVICES</a>
+                <a href="tanacsadas.html">CONSULTING</a>
+            </div>
+        </div>
+        <div class="torzs">
+            <div class="Intro">
+                <b>Just fill out our form and book an appointment!
+                </b>
+            </div>
+            <form id="bookingForm">
+                <label for="name">Name:</label><br>
+                <input type="text" id="name" name="name" required><br><br>
+                <label for="email">E-mail:</label><br>
+                <input type="email" id="email" name="email" required><br><br>
+                <label for="phone">Phone number:</label><br>
+                <input type="tel" id="phone" name="phone" required><br><br>
+                <label for="advisor">Select Advisor:</label><br>
+                <select id="advisor" name="advisor" required>
+                  <option value="">Choose an Advisor!</option>
+                  <option value="Kozma Gábor Tibor">Gábor Tibor Kozma</option>
+                </select><br><br>
+                <label for="openCalendarPage">Book an Appointment!</label><br>
+                <button id="openCalendarPage" type="button">Appointment Booking</button><br><br>
+                <label for="datetime">Choosen Appointment(date and time:)</label><br>
+                <input type="datetime-local" id="datetime" name="datetime" required readonly><br><br>
+                <input type="hidden" id="startTime" name="startTime">
+                <input type="hidden" id="endTime" name="endTime">
+                <label for="message">Briefy describe how we can assist you:</label><br>
+                <textarea id="message" name="message" rows="4" required></textarea><br><br>
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="adatvedelem" name="adatvedelem" required>
+                    <label for="adatvedelem">
+                        Accept the <a href="adatvedelmi.html" target="_blank">privacy policy</a>.
+                    </label>
+                </div><br><br>
+                <button type="submit">Confirm Appointment</button>
+            </form>
+        </div>
+        <div class="Labjegyzet">
+            <div class="lab">Phone number: 06-20/275 8962</div>
+            <div class="lab">Email: kozma.gabor@ovb.hu</div>
+            <div class="lab">
+                <a href="adatvedelmi.html">PRIVACY POLICY</a>
+            </div>
+        </div>
+            <div class="map-container">
+            <iframe 
+                src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d9171.22386527617!2d20.553084770469628!3d46.86092856989487!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e1!3m2!1shu!2shu!4v1747317800653!5m2!1shu!2shu" 
+                allowfullscreen="" 
+                loading="lazy" 
+                referrerpolicy="no-referrer-when-downgrade">
+            </iframe>
+        </div>
+        <script>
+
+            // Visszatöltjük az előzőleg elmentett űrlapadatokat (localStorage)
+            const savedData = localStorage.getItem('formData');
+            if (savedData) {
+                const data = JSON.parse(savedData);
+                if (data.name) document.getElementById('name').value = data.name;
+                if (data.email) document.getElementById('email').value = data.email;
+                if (data.phone) document.getElementById('phone').value = data.phone;
+                if (data.advisor) document.getElementById('advisor').value = data.advisor;
+                if (data.message) document.getElementById('message').value = data.message;
+                if (data.adatvedelem) document.getElementById('adatvedelem').checked = data.adatvedelem;
+            }
+
+
+            // Ellenőrizzük, hogy van-e választott időpont az URL-ben
+            const urlParams = new URLSearchParams(window.location.search);
+            const selectedStartTime = urlParams.get('selectedStartTime');
+            const selectedEndTime = urlParams.get('selectedEndTime');
+        
+            // Ha van választott időpont, akkor kitöltjük az űrlap dátum mezőjét
+            if (selectedStartTime && selectedEndTime) {
+                document.getElementById('datetime').value = selectedStartTime;
+                document.getElementById('startTime').value = selectedStartTime;
+                document.getElementById('endTime').value = selectedEndTime;
+            }
+
+            // Átirányítás az időpontfoglaló oldalra és adatok mentése localStorage-be
+            document.getElementById('openCalendarPage').addEventListener('click', function () {
+                localStorage.setItem('formData', JSON.stringify({
+                    name: document.getElementById('name').value,
+                    email: document.getElementById('email').value,
+                    phone: document.getElementById('phone').value,
+                    advisor: document.getElementById('advisor').value,
+                    message: document.getElementById('message').value,
+                    adatvedelem: document.getElementById('adatvedelem').checked
+                }));
+                window.location.href = '/foglalas.html'; // Naptár oldalad elérési útja
+            });
+        
+            // Eseménykezelő az űrlap beküldéséhez
+            document.getElementById('bookingForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const data = {
+                    name: document.getElementById('name').value.trim(),
+                    email: document.getElementById('email').value.trim(),
+                    phone: document.getElementById('phone').value.trim(),
+                    advisor: document.getElementById('advisor').value,
+                    message: document.getElementById('message').value.trim(),
+                    startTime: document.getElementById('startTime').value,
+                    endTime: document.getElementById('endTime').value,
+                    adatvedelem: document.getElementById('adatvedelem').checked ? 'on' : ''
+                };
+
+                fetch('/api/foglalas', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                })
+                .then(res => {
+                    if(res.ok) {
+                        alert('Időpontfoglalás sikeres! A foglalásról emailt küldtünk Önnek.');
+                        document.getElementById('bookingForm').reset();
+                        localStorage.removeItem('formData');
+                        localStorage.removeItem('selectedStartTime');
+                        localStorage.removeItem('selectedEndTime');
+                    } else {
+                        alert('Hiba történt. Kérjük, próbálja újra!');
+                    }
+                });
+            });
+        </script>
+    </body>
+</html>

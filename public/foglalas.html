@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@3.10.0/dist/fullcalendar.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script> <!-- stabilabb verzió -->
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.1/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@3.10.0/dist/fullcalendar.min.js"></script>
+    <title>Appointment Booking</title>
+</head>
+<body>
+    <h1>Book an Appointment!</h1>
+
+    <button id="goBackButton">Back to the consulting page</button>
+    <button id="selectTime">Appointment Booking</button><br><br>
+
+    <div id="calendar"></div>
+
+    <script>
+        $(document).ready(function () {
+            const customEvents = [];
+    
+            $('#calendar').fullCalendar({
+                defaultView: 'agendaWeek',
+                defaultDate: moment().format('YYYY-MM-DD'),
+                header: {
+                    left: 'prev,next today',
+                    center: 'title'
+                },
+                minTime: "08:00:00",
+                maxTime: "20:00:00",
+                contentHeight: "auto",
+                selectable: true,
+                selectHelper: true,
+    
+                // 🔄 Betöltjük a foglalt időpontokat háttérként (szürkítve)
+                events: function (start, end, timezone, callback) {
+                    fetch('/api/foglalasok')
+                        .then(response => response.json())
+                        .then(data => {
+                            callback(data); // már foglalt időpontok
+                        })
+                        .catch(error => {
+                            console.error('Error loading appointments:', error);
+                            callback([]);
+                        });
+                },
+    
+                // 🧠 Ellenőrizzük, hogy a kiválasztott időpont szabad-e
+                select: function (start, end) {
+                    const foglalt = $('#calendar').fullCalendar('clientEvents', function (event) {
+                        return (
+                            event.rendering === 'background' &&
+                            (
+                                (start.isSameOrAfter(event.start) && start.isBefore(event.end)) ||
+                                (end.isAfter(event.start) && end.isSameOrBefore(event.end)) ||
+                                (start.isBefore(event.start) && end.isAfter(event.end)) // teljes átfedés
+                            )
+                        );
+                    });
+    
+                    if (foglalt.length > 0) {
+                        alert('This time slot is already booked!');
+                        $('#calendar').fullCalendar('unselect');
+                        return;
+                    }
+    
+                    const selectedStartTime = moment(start).format('YYYY-MM-DD[T]HH:mm');
+                    const selectedEndTime = moment(end).format('YYYY-MM-DD[T]HH:mm');
+    
+                    localStorage.setItem('selectedStartTime', selectedStartTime);
+                    localStorage.setItem('selectedEndTime', selectedEndTime);
+    
+                    const newEvent = {
+                        id: 'selected-' + Date.now(),
+                        title: 'Choosen Appointment',
+                        start: start,
+                        end: end,
+                        backgroundColor: 'rgb(0, 57, 103)',
+                        borderColor: 'rgb(0, 57, 103)',
+                        textColor: 'white',
+                        allDay: false
+                    };
+    
+                    customEvents.push(newEvent);
+                    $('#calendar').fullCalendar('removeEventSources');
+                    $('#calendar').fullCalendar('addEventSource', customEvents);
+                    $('#calendar').fullCalendar('refetchEvents');
+    
+                    alert('Appointmnet selected: ' + selectedStartTime + ' - ' + selectedEndTime);
+                }
+            });
+    
+            // ⏩ Kiválasztás gomb
+            $('#selectTime').on('click', function () {
+                var selectedStartTime = localStorage.getItem('selectedStartTime');
+                var selectedEndTime = localStorage.getItem('selectedEndTime');
+                if (selectedStartTime && selectedEndTime) {
+                    const targetUrl = 'tanacsadas.html?selectedStartTime=' + encodeURIComponent(selectedStartTime) +
+                        '&selectedEndTime=' + encodeURIComponent(selectedEndTime);
+                    window.location.href = targetUrl;
+                } else {
+                    alert('Please select a time slot!');
+                }
+            });
+    
+            // 🔙 Vissza gomb
+            document.getElementById('goBackButton').addEventListener('click', function () {
+                if (document.referrer.indexOf('tanacsadas.html') > -1) {
+                    window.location.href = 'tanacsadas.html';
+                } else {
+                    window.location.href = 'index.html';
+                }
+            });
+        });
+    </script>
+    
+</body>
+</html>
