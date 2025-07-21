@@ -6,6 +6,7 @@
 html, body {
     height: 100%;
     width: 100%;
+    max-width: 100%;
 }
 .Fejlec {
     background-color: rgb(0, 57, 103);
@@ -74,6 +75,7 @@ html, body {
 .kep1 {
     width: 350px;
     height: auto;
+    max-width: 100%;
 }
 .Intro1 {
     font-size: 25px;
@@ -125,6 +127,7 @@ html, body {
 }
 .map-container iframe {
     width: 100%;
+    max-width: 100%;
     height: 400px;
     background-origin: none;
 }
@@ -150,20 +153,24 @@ textarea {
     width: 800px;
     box-sizing: border-box;
     padding: 10px;
+    max-width: 100%;
 }
 input {
     font-size: 20px;
     width: 300px;
     box-sizing: border-box;
     padding: 5px;
+    max-width: 100%;
 }
 #advisor {
     font-size: 20px;
     width: 300px;
+    max-width: 100%;
 }
 #openCalendarPage {
     font-size: 20px;
     width: 300px;
+    max-width: 100%;
 }
 button[type="submit"] {
     font-size: 20px;
@@ -202,3 +209,48 @@ button[type="submit"] {
     color: azure;
     background-color: rgb(0, 57, 103);
 }
+@media (max-width: 768px) {
+    body {
+        flex-direction: column;
+        text-align: center;
+    }
+    .nav-menu {
+      flex-direction: column;
+    }
+    .menu-container {
+        flex-direction: column;
+    }
+    .map-container {
+        flex-direction: column;
+    }
+    .torzs {
+        flex-direction: column;
+    }
+    .Intro {
+        font-size: 20px;
+        text-align: center;
+    }
+    .szolg {
+        flex-direction: column;
+    }
+    .bemutatkozas {
+        flex-direction: column;
+        text-align: center;
+    }
+    .bem1 {
+        text-align: right;
+        padding: 0;
+        padding-top: 75px;
+        font-size: 20px;
+    }
+    .Intro1 {
+        font-size: 20px;
+        text-align: center;
+    }
+    .hero-text {
+      font-size: 1.2rem;
+    }
+    .Labjegyzet {
+        flex-direction: column;
+    }
+  }
