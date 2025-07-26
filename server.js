@@ -3,13 +3,13 @@ const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const { MongoClient } = require('mongodb');
+const cron = require('node-cron');
 require('dotenv').config();
 
 const PORT = 3000;
 const MONGO_URI = process.env.MONGO_URI;
 const publicDir = path.join(__dirname, 'public');
 
-// MIME típusok
 const mimeTypes = {
   '.html': 'text/html',
   '.css': 'text/css',
@@ -23,50 +23,41 @@ const mimeTypes = {
   '.svg': 'image/svg+xml'
 };
 
-// Egyszerű XSS elleni tisztítás
 function sanitize(str) {
   return String(str).replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// Validációs függvény
-function validateBooking(booking) {
+function validateContact(data) {
   const errors = [];
 
-  if (!booking.name || booking.name.length < 2 || booking.name.length > 100) {
-    errors.push('Invalid name');
-  }
-
-  if (!/^[\w.-]+@[\w.-]+\.[a-z]{2,}$/i.test(booking.email)) {
+  if (!data.email || !/^[\w.-]+@[\w.-]+\.[a-z]{2,}$/i.test(data.email)) {
     errors.push('Invalid e-mail');
   }
 
-  if (!/^\+?[0-9\s\-]{7,20}$/.test(booking.phone)) {
-    errors.push('Invalid phone number');
-  }
-
-  if (!booking.advisor || booking.advisor.length < 2) {
-    errors.push('Invalid advisor');
-  }
-
-  if (!booking.message || booking.message.length > 1000) {
+  if (!data.message || data.message.length > 1000) {
     errors.push('Message is missing or too long');
   }
 
-  if (!booking.startTime || !booking.endTime) {
-    errors.push('Missing datetime');
+  if (!data.privacyAccepted) {
+    errors.push('You must accept the privacy policy');
   }
 
   return errors;
 }
 
-// MongoDB kliens létrehozása
 MongoClient.connect(MONGO_URI)
   .then(client => {
-    console.log('Successfully connected to MongoDB!');
+    console.log('✅ MongoDB connection successful');
     const db = client.db('idopontfoglalas');
-    const foglalasokCollection = db.collection('foglalasok');
+    const contactsCollection = db.collection('contacts');
 
-    // HTTP szerver
+    // Heti egyszeri automatikus törlés (vasárnap 3:00-kor)
+    cron.schedule('0 3 * * 0', async () => {
+      const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const result = await contactsCollection.deleteMany({ timestamp: { $lt: oneWeekAgo } });
+      console.log(`🗑️ Weekly cleanup: deleted ${result.deletedCount} old contact(s).`);
+    });
+
     const server = http.createServer((req, res) => {
       if (req.method === 'GET') {
         let safePath = req.url.split('?')[0];
@@ -92,26 +83,7 @@ MongoClient.connect(MONGO_URI)
           }
         });
 
-      } else if (req.method === 'GET' && req.url === '/api/foglalasok') {
-        foglalasokCollection.find({}).toArray()
-          .then(foglalasok => {
-            const idopontok = foglalasok.map(f => ({
-              title: 'Booked',
-              startTime: f.startTime,
-              endTime: f.endTime,
-              rendering: 'background',
-              color: 'gray'
-            }));
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(idopontok));
-          })
-          .catch(err => {
-            console.error('Error fetching bookings:', err);
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ status: 'error', message: 'Adatbázis hiba' }));
-          });
-
-      } else if (req.method === 'POST' && req.url === '/api/foglalas') {
+      } else if (req.method === 'POST' && req.url === '/api/contact') {
         let body = '';
 
         req.on('data', chunk => {
@@ -120,78 +92,82 @@ MongoClient.connect(MONGO_URI)
 
         req.on('end', () => {
           try {
-            const booking = JSON.parse(body);
-            console.log('New appointment received:', booking);
+            const data = JSON.parse(body);
+            console.log('📨 New contact received:', data);
 
-            const errors = validateBooking(booking);
+            const errors = validateContact(data);
             if (errors.length > 0) {
               res.writeHead(400, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ status: 'error', message: errors.join(', ') }));
               return;
             }
 
-            // XSS védelem
-            booking.name = sanitize(booking.name);
-            booking.email = sanitize(booking.email);
-            booking.phone = sanitize(booking.phone);
-            booking.advisor = sanitize(booking.advisor);
-            booking.message = sanitize(booking.message);
+            const email = sanitize(data.email);
+            const message = sanitize(data.message);
+            const privacyAccepted = !!data.privacyAccepted; // boolean
+            const privacyAcceptedAt = new Date();
 
-            foglalasokCollection.insertOne(booking)
-              .then(() => {
-                const transporter = nodemailer.createTransport({
-                  service: 'gmail',
-                  auth: {
-                    user: process.env.EMAIL_USER,
-                    pass: process.env.EMAIL_PASS
-                  }
-                });
-
-                const mailOptions = {
-                  from: process.env.EMAIL_USER,
-                  to: booking.email,
-                  subject: 'Időpontfoglalás megerősítése',
-                  text: `
-Kedves ${booking.name}!
-
-Köszönjük, hogy időpontot foglalt nálunk. Felkészült tanácsadónk várni fogja Önt
-irodánkban a megbeszélt időpontban.
-
-Foglalási adatok:
-- Tanácsadó: ${booking.advisor}
-- Időpont: ${booking.startTime}
-- Telefonszám: ${booking.phone}
-
-Üzenet: ${booking.message}
-
-Üdvözlettel,
-Kozma Consulting
-                  `
-                };
-
-                transporter.sendMail(mailOptions, (error, info) => {
-                  if (error) {
-                    console.error('Hiba az email küldésekor:', error);
-                    res.writeHead(500, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ status: 'error', message: 'Nem sikerült az email küldése' }));
-                    return;
-                  }
-
-                  console.log('Email elküldve: ' + info.response);
-                  res.writeHead(200, { 'Content-Type': 'application/json' });
-                  res.end(JSON.stringify({ status: 'ok' }));
-                });
-              })
-              .catch(err => {
-                console.error('Error saving to database:', err);
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ status: 'error', message: 'Nem sikerült menteni az adatot' }));
+            contactsCollection.insertOne({
+              email,
+              message,
+              timestamp: new Date(),
+              privacyAccepted,
+              privacyAcceptedAt
+            })
+            .then(() => {
+              const transporter = nodemailer.createTransport({
+                service: 'gmail',
+                auth: {
+                  user: process.env.EMAIL_USER,
+                  pass: process.env.EMAIL_PASS
+                }
               });
 
+              const mailOptions = {
+                from: process.env.EMAIL_USER,
+                to: [email, process.env.EMAIL_USER],
+                subject: 'Thank you for contacting Kozma-Consulting',
+                text: `Dear User,
+
+Thank you for reaching out to us. We received the following message from you:
+
+"${message}"
+
+We will get back to you as soon as possible.
+
+---
+
+Please note: This message may contain personal data, which we use solely for processing your inquiry. 
+You have the right to request the correction or deletion of your data at any time by contacting us at 
+gtoth0714@gmail.com. Your data will be stored for no longer than 7 days.
+
+Best regards,  
+Kozma Consulting`
+              };
+
+              transporter.sendMail(mailOptions, (error, info) => {
+                if (error) {
+                  console.error('❌ Email sending failed:', error);
+                  res.writeHead(500, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify({ status: 'error', message: 'Failed to send email' }));
+                  return;
+                }
+
+                console.log('📧 Email sent: ' + info.response);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ status: 'ok' }));
+              });
+            })
+            .catch(err => {
+              console.error('❌ Database save error:', err);
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ status: 'error', message: 'Failed to save data' }));
+            });
+
           } catch (err) {
-            console.error('Error processing data:', err);
+            console.error('❌ Invalid JSON:', err);
             res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ status: 'error', message: 'Érvénytelen adat' }));
+            res.end(JSON.stringify({ status: 'error', message: 'Invalid data' }));
           }
         });
 
@@ -202,9 +178,9 @@ Kozma Consulting
     });
 
     server.listen(PORT, () => {
-      console.log(`Server running: http://localhost:${PORT}`);
+      console.log(`🚀 Server running at http://localhost:${PORT}`);
     });
   })
   .catch(err => {
-    console.error('Failed to connect to MongoDB:', err);
+    console.error('❌ MongoDB connection failed:', err);
   });
