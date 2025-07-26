@@ -10,19 +10,18 @@ To avoid fake bookings, the booking functionality has been deliberately disabled
 
 ### 1. Clone the repository:
 
-```bash
 git clone https://github.com/gtoth0714/_Kozma.git
-cd sajat-weboldal
+cd _Kozma
 
 ### 2. Set up environment variables:
 Create a .env file in the root directory with the required configuration keys. Example:
 
-DATABASE_URL=your_database_url_here
+MONGO_URI=your_database_url_here
 EMAIL_USER=your_email_user
 EMAIL_PASS=your_email_pass
 
 ### 3. Install dependencies:
-Run the following commands (depending on your setup, you might only need npm install):
+Run the following commands:
 
 npm install
 npm install mongoose
@@ -46,12 +45,12 @@ Note: The booking functionality is disabled in this public demo to prevent fake 
 - Easy to deploy to platforms like Render
 
 ## Privacy & GDPR Notice:
-- The system stores only email + message, plus checkbox state + timestamp.
-- Data is stored for a maximum of 7 days, then automatically deleted.
-- Privacy policy consent is required before submission.
-- No personal data is included in this repository.
+- The system stores only email + message, plus checkbox state + timestamp
+- Data is stored for a maximum of 7 days, then automatically deleted
+- Privacy policy consent is required before submission
+- No personal data is included in this repository
 
 ## Public Demo Notice:
 To avoid misuse:
-- The booking functionality (email + DB) is disabled by default.
-- You are free to test locally using your own email/app password.
+- The booking functionality (email + DB) is disabled by default
+- You are free to test locally using your own email/app password
